@@ -25,12 +25,12 @@ function AuthPage() {
           setIsLoading(false)
           return
         }
-        await createUser(username, password)
-        login(username)
+        const user = await createUser(username, password)
+        login(user)
       } else {
         // Sign in mode
-        await authenticateUser(username, password)
-        login(username)
+        const user = await authenticateUser(username, password)
+        login(user)
       }
     } catch (err) {
       setError(err.message)
@@ -148,7 +148,7 @@ function AuthPage() {
           <div className="demo-info">
             <p>
               <i className="fas fa-info-circle"></i>
-              Demo: All data is stored locally in your browser. No server involved.
+              Your account and movies are synced with Firebase across devices.
             </p>
           </div>
         </div>

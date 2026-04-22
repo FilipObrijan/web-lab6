@@ -4,7 +4,7 @@ A modern, client-side web application for managing your personal movie watchlist
 
 ## 🎬 Application Overview
 
-The Movie Watchlist Manager is a fully client-side web application built with React and Vite that allows users to create and manage their personal movie collection. The app features entity manipulation (add/remove), liking/favoriting, filtering, and persistent storage using browser localStorage.
+The Movie Watchlist Manager is a web application built with React and Vite that allows users to create and manage their personal movie collection. The app features entity manipulation (add/remove), liking/favoriting, filtering, and persistent storage with Firebase Authentication and Cloud Firestore.
 
 ### Key Features
 
@@ -13,7 +13,7 @@ The Movie Watchlist Manager is a fully client-side web application built with Re
 - 🎯 **Filter Movies**: Filter by status (Watched, Unwatched, Planned) or search by title/genre
 - 📊 **Statistics**: View real-time stats of your movie collection
 - 🌓 **Dark/Light Mode**: Toggle between light and dark themes
-- 💾 **Local Storage**: All data persists in browser localStorage
+- ☁️ **Cloud Sync**: Accounts and movies are synced with Firebase across devices
 - 📱 **Responsive Design**: Works seamlessly on desktop, tablet, and mobile devices
 - ♿ **Accessible**: Built with semantic HTML and ARIA attributes
 
@@ -24,7 +24,7 @@ The Movie Watchlist Manager is a fully client-side web application built with Re
 - **Styling**: Custom CSS with CSS Variables for theming
 - **Icons**: Font Awesome 6.4.0
 - **State Management**: React Hooks
-- **Storage**: Browser localStorage
+- **Storage**: Firebase Authentication + Cloud Firestore
 - **Hosting**: GitHub Pages
 
 ## 📊 Application Flow
@@ -228,6 +228,11 @@ The theme toggle is saved in localStorage and restored on app reload.
 # Install dependencies
 npm install
 
+# Create env file from template
+cp .env.example .env
+
+# Fill .env with your Firebase Web App config values
+
 # Start development server
 npm run dev
 
@@ -237,6 +242,14 @@ npm run build
 # Deploy to GitHub Pages
 npm run deploy
 ```
+
+### Firebase Setup
+
+1. Create a Firebase project in Firebase Console.
+2. Enable Authentication with Email/Password sign-in method.
+3. Create a Firestore database.
+4. Add a Web app in Firebase project settings and copy config values.
+5. Put config values into your `.env` file using `.env.example` keys.
 
 ## 📋 Development Requirements Met
 

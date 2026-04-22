@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect } from 'react'
-import { getCurrentUser, setCurrentUser, logout as authLogout } from '../utils/auth'
+import { logout as authLogout, observeAuthState } from '../utils/auth'
 
 export const AuthContext = createContext()
 
@@ -7,22 +7,29 @@ export function AuthProvider({ children }) {
   const [currentUser, setCurrentUserState] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Load current user from localStorage on mount
+  // Subscribe to Firebase authentication state
   useEffect(() => {
-    const user = getCurrentUser()
-    if (user) {
-      setCurrentUserState(user)
+    let unsubscribe = () => {}
+
+    try {
+      unsubscribe = observeAuthState((user) => {
+        setCurrentUserState(user)
+        setIsLoading(false)
+      })
+    } catch (error) {
+      console.error(error)
+      setIsLoading(false)
     }
-    setIsLoading(false)
+
+    return () => unsubscribe()
   }, [])
 
-  const login = (username) => {
-    setCurrentUser(username)
-    setCurrentUserState(username)
+  const login = (user) => {
+    setCurrentUserState(user)
   }
 
-  const logout = () => {
-    authLogout()
+  const logout = async () => {
+    await authLogout()
     setCurrentUserState(null)
   }
 

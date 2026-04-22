@@ -26,17 +26,38 @@ function AppContent() {
 
   // Load user's movies when currentUser changes
   useEffect(() => {
-    if (currentUser) {
-      const userMovies = getUserMovies(currentUser)
-      setMovies(userMovies)
+    async function loadMovies() {
+      if (!currentUser?.uid) {
+        setMovies([])
+        return
+      }
+
+      try {
+        const userMovies = await getUserMovies(currentUser.uid)
+        setMovies(userMovies)
+      } catch (error) {
+        console.error('Failed to load movies:', error)
+      }
     }
+
+    loadMovies()
   }, [currentUser])
 
   // Save movies whenever they change
   useEffect(() => {
-    if (currentUser) {
-      updateUserMovies(currentUser, movies)
+    async function saveMovies() {
+      if (!currentUser?.uid) {
+        return
+      }
+
+      try {
+        await updateUserMovies(currentUser.uid, movies)
+      } catch (error) {
+        console.error('Failed to save movies:', error)
+      }
     }
+
+    saveMovies()
   }, [movies, currentUser])
 
   // Save theme whenever it changes

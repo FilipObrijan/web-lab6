@@ -11,7 +11,7 @@ function UserProfile() {
           <i className="fas fa-user-circle"></i>
         </div>
         <div className="user-details">
-          <span className="user-name">{currentUser}</span>
+          <span className="user-name">{currentUser?.username || 'User'}</span>
           <small className="user-status">Logged In</small>
         </div>
       </div>

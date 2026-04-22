@@ -1,106 +1,155 @@
-// Simple password hashing utility using bcryptjs
-import * as bcrypt from 'bcryptjs'
+import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+  updateProfile
+} from 'firebase/auth'
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
+import { auth, db, isFirebaseConfigured } from '../firebase'
 
-const SALT_ROUNDS = 10
-
-export async function hashPassword(password) {
-  try {
-    return await bcrypt.hash(password, SALT_ROUNDS)
-  } catch (error) {
-    console.error('Error hashing password:', error)
-    throw error
+function ensureFirebaseConfigured() {
+  if (!isFirebaseConfigured || !auth || !db) {
+    throw new Error('Firebase is not configured. Add VITE_FIREBASE_* values in your environment.')
   }
 }
 
-export async function verifyPassword(password, hash) {
-  try {
-    return await bcrypt.compare(password, hash)
-  } catch (error) {
-    console.error('Error verifying password:', error)
-    return false
+function normalizeUsername(username) {
+  return username.trim().toLowerCase()
+}
+
+function usernameToEmail(username) {
+  const normalized = normalizeUsername(username)
+  const isValid = /^[a-z0-9._-]{3,30}$/.test(normalized)
+
+  if (!isValid) {
+    throw new Error('Username can use only letters, numbers, dot, underscore, hyphen (3-30 chars).')
   }
+
+  return `${normalized}@watchlist.app`
 }
 
-// User management functions
-export function getAllUsers() {
-  const usersJSON = localStorage.getItem('users')
-  return usersJSON ? JSON.parse(usersJSON) : {}
+function firebaseErrorToMessage(error, fallback) {
+  if (error?.code === 'auth/email-already-in-use') {
+    return 'Username already exists'
+  }
+
+  if (error?.code === 'auth/invalid-credential' || error?.code === 'auth/user-not-found') {
+    return 'Username or password incorrect'
+  }
+
+  if (error?.code === 'auth/weak-password') {
+    return 'Password must be at least 6 characters'
+  }
+
+  return fallback
 }
 
-export function getUserByUsername(username) {
-  const users = getAllUsers()
-  return users[username] || null
+async function getUsernameByUser(firebaseUser) {
+  const usernameFromProfile = firebaseUser.displayName
+  if (usernameFromProfile) {
+    return usernameFromProfile
+  }
+
+  const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid))
+  if (userDoc.exists()) {
+    return userDoc.data().username || firebaseUser.email?.split('@')[0] || 'user'
+  }
+
+  return firebaseUser.email?.split('@')[0] || 'user'
 }
 
 export async function createUser(username, password) {
-  const users = getAllUsers()
-  
-  if (users[username]) {
-    throw new Error('Username already exists')
-  }
-  
-  if (username.trim().length < 3) {
-    throw new Error('Username must be at least 3 characters')
-  }
-  
+  ensureFirebaseConfigured()
+
   if (password.length < 6) {
     throw new Error('Password must be at least 6 characters')
   }
-  
-  const passwordHash = await hashPassword(password)
-  
-  users[username] = {
-    username,
-    passwordHash,
-    createdAt: new Date().toISOString(),
-    movies: []
+
+  try {
+    const email = usernameToEmail(username)
+    const normalizedUsername = normalizeUsername(username)
+    const credentials = await createUserWithEmailAndPassword(auth, email, password)
+
+    await updateProfile(credentials.user, {
+      displayName: normalizedUsername
+    })
+
+    await setDoc(doc(db, 'users', credentials.user.uid), {
+      username: normalizedUsername,
+      movies: [],
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }, { merge: true })
+
+    return {
+      uid: credentials.user.uid,
+      username: normalizedUsername,
+      email: credentials.user.email
+    }
+  } catch (error) {
+    throw new Error(firebaseErrorToMessage(error, 'Unable to create account'))
   }
-  
-  localStorage.setItem('users', JSON.stringify(users))
-  return users[username]
 }
 
 export async function authenticateUser(username, password) {
-  const user = getUserByUsername(username)
-  
-  if (!user) {
-    throw new Error('Username or password incorrect')
-  }
-  
-  const isPasswordValid = await verifyPassword(password, user.passwordHash)
-  
-  if (!isPasswordValid) {
-    throw new Error('Username or password incorrect')
-  }
-  
-  return user
-}
+  ensureFirebaseConfigured()
 
-export function getUserMovies(username) {
-  const user = getUserByUsername(username)
-  return user ? user.movies : []
-}
+  try {
+    const email = usernameToEmail(username)
+    const credentials = await signInWithEmailAndPassword(auth, email, password)
+    const resolvedUsername = await getUsernameByUser(credentials.user)
 
-export function updateUserMovies(username, movies) {
-  const users = getAllUsers()
-  if (users[username]) {
-    users[username].movies = movies
-    localStorage.setItem('users', JSON.stringify(users))
+    return {
+      uid: credentials.user.uid,
+      username: resolvedUsername,
+      email: credentials.user.email
+    }
+  } catch (error) {
+    throw new Error(firebaseErrorToMessage(error, 'Unable to sign in'))
   }
 }
 
-export function setCurrentUser(username) {
-  if (username) {
-    localStorage.setItem('currentUser', username)
-  } else {
-    localStorage.removeItem('currentUser')
+export function observeAuthState(callback) {
+  ensureFirebaseConfigured()
+
+  return onAuthStateChanged(auth, async (firebaseUser) => {
+    if (!firebaseUser) {
+      callback(null)
+      return
+    }
+
+    const username = await getUsernameByUser(firebaseUser)
+
+    callback({
+      uid: firebaseUser.uid,
+      username,
+      email: firebaseUser.email
+    })
+  })
+}
+
+export async function getUserMovies(userId) {
+  ensureFirebaseConfigured()
+
+  const userDoc = await getDoc(doc(db, 'users', userId))
+  if (!userDoc.exists()) {
+    return []
   }
+
+  return userDoc.data().movies || []
 }
 
-export function getCurrentUser() {
-  return localStorage.getItem('currentUser')
+export async function updateUserMovies(userId, movies) {
+  ensureFirebaseConfigured()
+
+  await setDoc(doc(db, 'users', userId), {
+    movies,
+    updatedAt: serverTimestamp()
+  }, { merge: true })
 }
 
-export function logout() {
-  localStorage.removeItem('currentUser')
+export async function logout() {
+  ensureFirebaseConfigured()
+  await signOut(auth)
 }
