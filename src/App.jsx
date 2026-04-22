@@ -1,39 +1,44 @@
 import { useState, useEffect } from 'react'
 import './App.css'
+import { AuthProvider, useAuth } from './context/AuthContext'
 import MovieList from './components/MovieList'
 import AddMovieForm from './components/AddMovieForm'
 import FilterBar from './components/FilterBar'
 import ThemeToggle from './components/ThemeToggle'
+import UserProfile from './components/UserProfile'
+import AuthPage from './components/AuthPage'
+import { getUserMovies, updateUserMovies } from './utils/auth'
 
-function App() {
+function AppContent() {
+  const { currentUser, isLoading } = useAuth()
   const [movies, setMovies] = useState([])
   const [filter, setFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [theme, setTheme] = useState('light')
 
-  // Load movies and theme from localStorage on mount
+  // Load theme on mount
   useEffect(() => {
-    const savedMovies = localStorage.getItem('movies')
     const savedTheme = localStorage.getItem('theme') || 'light'
-    
-    if (savedMovies) {
-      try {
-        setMovies(JSON.parse(savedMovies))
-      } catch (e) {
-        console.error('Error loading movies:', e)
-      }
-    }
-    
     setTheme(savedTheme)
     document.documentElement.setAttribute('data-theme', savedTheme)
   }, [])
 
-  // Save movies to localStorage whenever they change
+  // Load user's movies when currentUser changes
   useEffect(() => {
-    localStorage.setItem('movies', JSON.stringify(movies))
-  }, [movies])
+    if (currentUser) {
+      const userMovies = getUserMovies(currentUser)
+      setMovies(userMovies)
+    }
+  }, [currentUser])
 
-  // Save theme to localStorage whenever it changes
+  // Save movies whenever they change
+  useEffect(() => {
+    if (currentUser) {
+      updateUserMovies(currentUser, movies)
+    }
+  }, [movies, currentUser])
+
+  // Save theme whenever it changes
   useEffect(() => {
     localStorage.setItem('theme', theme)
     document.documentElement.setAttribute('data-theme', theme)
@@ -88,6 +93,21 @@ function App() {
     liked: movies.filter(m => m.isLiked).length
   }
 
+  if (isLoading) {
+    return (
+      <div className="app-loading">
+        <div className="loading-spinner">
+          <i className="fas fa-spinner fa-spin"></i>
+          <p>Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!currentUser) {
+    return <AuthPage />
+  }
+
   return (
     <div className="app">
       <header className="app-header">
@@ -97,8 +117,11 @@ function App() {
               <i className="fas fa-film"></i>
               <h1>Movie Watchlist</h1>
             </div>
-            <ThemeToggle theme={theme} onToggle={toggleTheme} />
+            <div className="header-controls">
+              <ThemeToggle theme={theme} onToggle={toggleTheme} />
+            </div>
           </div>
+          <UserProfile />
         </div>
       </header>
 
@@ -167,6 +190,14 @@ function App() {
         </div>
       </main>
     </div>
+  )
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   )
 }
 
