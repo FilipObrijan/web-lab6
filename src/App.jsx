@@ -3,6 +3,7 @@ import './App.css'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import MovieList from './components/MovieList'
 import AddMovieForm from './components/AddMovieForm'
+import MovieSearch from './components/MovieSearch'
 import FilterBar from './components/FilterBar'
 import ThemeToggle from './components/ThemeToggle'
 import UserProfile from './components/UserProfile'
@@ -51,7 +52,30 @@ function AppContent() {
       isLiked: false,
       dateAdded: new Date().toISOString()
     }
-    setMovies([newMovie, ...movies])
+
+    setMovies((previousMovies) => [newMovie, ...previousMovies])
+  }
+
+  const addMovieFromSearch = (movieData) => {
+    const newMovie = {
+      ...movieData,
+      id: Date.now(),
+      isLiked: false,
+      dateAdded: new Date().toISOString()
+    }
+
+    setMovies((previousMovies) => {
+      const alreadyExists = previousMovies.some(movie =>
+        (newMovie.externalId && movie.externalId === newMovie.externalId) ||
+        (movie.title.toLowerCase() === newMovie.title.toLowerCase() && movie.year === newMovie.year)
+      )
+
+      if (alreadyExists) {
+        return previousMovies
+      }
+
+      return [newMovie, ...previousMovies]
+    })
   }
 
   const removeMovie = (id) => {
@@ -130,6 +154,11 @@ function AppContent() {
           <div className="app-layout">
             <div className="main-content">
               <AddMovieForm onAddMovie={addMovie} />
+
+              <MovieSearch
+                movies={movies}
+                onAddMovie={addMovieFromSearch}
+              />
               
               <FilterBar 
                 filter={filter}
