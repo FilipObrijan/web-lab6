@@ -1,155 +1,110 @@
-import {
-  createUserWithEmailAndPassword,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut,
-  updateProfile
-} from 'firebase/auth'
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
-import { auth, db, isFirebaseConfigured } from '../firebase'
+const STORAGE_KEY = 'watchlist-access-token'
 
-function ensureFirebaseConfigured() {
-  if (!isFirebaseConfigured || !auth || !db) {
-    throw new Error('Firebase is not configured. Add VITE_FIREBASE_* values in your environment.')
-  }
+function base64UrlDecode(input) {
+  const normalized = input.replace(/-/g, '+').replace(/_/g, '/')
+  const padding = '='.repeat((4 - (normalized.length % 4)) % 4)
+  return atob(normalized + padding)
 }
 
-function normalizeUsername(username) {
-  return username.trim().toLowerCase()
-}
-
-function usernameToEmail(username) {
-  const normalized = normalizeUsername(username)
-  const isValid = /^[a-z0-9._-]{3,30}$/.test(normalized)
-
-  if (!isValid) {
-    throw new Error('Username can use only letters, numbers, dot, underscore, hyphen (3-30 chars).')
-  }
-
-  return `${normalized}@watchlist.app`
-}
-
-function firebaseErrorToMessage(error, fallback) {
-  if (error?.code === 'auth/email-already-in-use') {
-    return 'Username already exists'
-  }
-
-  if (error?.code === 'auth/invalid-credential' || error?.code === 'auth/user-not-found') {
-    return 'Username or password incorrect'
-  }
-
-  if (error?.code === 'auth/weak-password') {
-    return 'Password must be at least 6 characters'
-  }
-
-  return fallback
-}
-
-async function getUsernameByUser(firebaseUser) {
-  const usernameFromProfile = firebaseUser.displayName
-  if (usernameFromProfile) {
-    return usernameFromProfile
-  }
-
-  const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid))
-  if (userDoc.exists()) {
-    return userDoc.data().username || firebaseUser.email?.split('@')[0] || 'user'
-  }
-
-  return firebaseUser.email?.split('@')[0] || 'user'
-}
-
-export async function createUser(username, password) {
-  ensureFirebaseConfigured()
-
-  if (password.length < 6) {
-    throw new Error('Password must be at least 6 characters')
+export function decodeToken(token) {
+  if (!token) {
+    return null
   }
 
   try {
-    const email = usernameToEmail(username)
-    const normalizedUsername = normalizeUsername(username)
-    const credentials = await createUserWithEmailAndPassword(auth, email, password)
-
-    await updateProfile(credentials.user, {
-      displayName: normalizedUsername
-    })
-
-    await setDoc(doc(db, 'users', credentials.user.uid), {
-      username: normalizedUsername,
-      movies: [],
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    }, { merge: true })
-
-    return {
-      uid: credentials.user.uid,
-      username: normalizedUsername,
-      email: credentials.user.email
+    const [, payload] = token.split('.')
+    if (!payload) {
+      return null
     }
-  } catch (error) {
-    throw new Error(firebaseErrorToMessage(error, 'Unable to create account'))
+
+    return JSON.parse(base64UrlDecode(payload))
+  } catch {
+    return null
   }
 }
 
-export async function authenticateUser(username, password) {
-  ensureFirebaseConfigured()
+export function getStoredToken() {
+  return localStorage.getItem(STORAGE_KEY) || ''
+}
 
-  try {
-    const email = usernameToEmail(username)
-    const credentials = await signInWithEmailAndPassword(auth, email, password)
-    const resolvedUsername = await getUsernameByUser(credentials.user)
+export function saveToken(token) {
+  localStorage.setItem(STORAGE_KEY, token)
+}
 
-    return {
-      uid: credentials.user.uid,
-      username: resolvedUsername,
-      email: credentials.user.email
-    }
-  } catch (error) {
-    throw new Error(firebaseErrorToMessage(error, 'Unable to sign in'))
+export function clearToken() {
+  localStorage.removeItem(STORAGE_KEY)
+}
+
+export function getCurrentSession() {
+  const token = getStoredToken()
+  if (!token) {
+    return null
+  }
+
+  const decoded = decodeToken(token)
+  if (!decoded?.exp) {
+    clearToken()
+    return null
+  }
+
+  if (decoded.exp * 1000 <= Date.now()) {
+    clearToken()
+    return null
+  }
+
+  return {
+    token,
+    username: decoded.username || decoded.sub || 'demo-user',
+    role: decoded.role || 'VISITOR',
+    permissions: Array.isArray(decoded.permissions) ? decoded.permissions : [],
+    expiresAt: decoded.exp * 1000
   }
 }
 
 export function observeAuthState(callback) {
-  ensureFirebaseConfigured()
-
-  return onAuthStateChanged(auth, async (firebaseUser) => {
-    if (!firebaseUser) {
-      callback(null)
-      return
-    }
-
-    const username = await getUsernameByUser(firebaseUser)
-
-    callback({
-      uid: firebaseUser.uid,
-      username,
-      email: firebaseUser.email
-    })
-  })
+  callback(getCurrentSession())
+  return () => {}
 }
 
-export async function getUserMovies(userId) {
-  ensureFirebaseConfigured()
-
-  const userDoc = await getDoc(doc(db, 'users', userId))
-  if (!userDoc.exists()) {
-    return []
+function normalizePermissions(permissions) {
+  if (Array.isArray(permissions)) {
+    return permissions.map((permission) => String(permission).trim().toUpperCase()).filter(Boolean)
   }
 
-  return userDoc.data().movies || []
+  if (typeof permissions === 'string') {
+    return permissions.split(',').map((permission) => permission.trim().toUpperCase()).filter(Boolean)
+  }
+
+  return []
 }
 
-export async function updateUserMovies(userId, movies) {
-  ensureFirebaseConfigured()
+export async function requestAccessToken({ username, role, permissions, mode = 'POST' }) {
+  const normalizedPermissions = normalizePermissions(permissions)
+  const normalizedRole = String(role || 'VISITOR').trim().toUpperCase()
 
-  await setDoc(doc(db, 'users', userId), {
-    movies,
-    updatedAt: serverTimestamp()
-  }, { merge: true })
+  const response = mode === 'GET'
+    ? await fetch(`/token?username=${encodeURIComponent(username || 'demo-user')}&role=${encodeURIComponent(normalizedRole)}&permissions=${encodeURIComponent(normalizedPermissions.join(','))}`)
+    : await fetch('/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          username: username || 'demo-user',
+          role: normalizedRole,
+          permissions: normalizedPermissions
+        })
+      })
+
+  const payload = await response.json().catch(() => ({}))
+
+  if (!response.ok) {
+    throw new Error(payload.message || 'Unable to generate access token')
+  }
+
+  return payload
 }
 
 export async function logout() {
-  ensureFirebaseConfigured()
-  await signOut(auth)
+  clearToken()
 }

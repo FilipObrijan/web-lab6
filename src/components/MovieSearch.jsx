@@ -56,6 +56,16 @@ function MovieSearch({ movies, onAddMovie }) {
     }
   }
 
+  const handleAddMovie = async (item) => {
+    setError('')
+
+    try {
+      await onAddMovie(toWatchlistMovie(item))
+    } catch (requestError) {
+      setError(requestError.message || 'Unable to add movie')
+    }
+  }
+
   return (
     <section className="movie-search" aria-label="Search movies online">
       <div className="movie-search-header">
@@ -100,7 +110,7 @@ function MovieSearch({ movies, onAddMovie }) {
                   <p>{item.primaryGenreName || 'Unknown'} • {item.releaseDate ? new Date(item.releaseDate).getFullYear() : 'N/A'}</p>
                   <button
                     type="button"
-                    onClick={() => onAddMovie(toWatchlistMovie(item))}
+                    onClick={() => handleAddMovie(item)}
                     disabled={isAdded}
                   >
                     {isAdded ? 'Already Added' : 'Add to Watchlist'}

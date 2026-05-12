@@ -3,6 +3,7 @@ import './UserProfile.css'
 
 function UserProfile() {
   const { currentUser, logout } = useAuth()
+  const expiresAtLabel = currentUser?.expiresAt ? new Date(currentUser.expiresAt).toLocaleTimeString() : 'Unknown'
 
   return (
     <div className="user-profile">
@@ -12,7 +13,7 @@ function UserProfile() {
         </div>
         <div className="user-details">
           <span className="user-name">{currentUser?.username || 'User'}</span>
-          <small className="user-status">Logged In</small>
+          <small className="user-status">Role: {currentUser?.role || 'VISITOR'} · Expires: {expiresAtLabel}</small>
         </div>
       </div>
       <button

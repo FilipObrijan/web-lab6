@@ -1,0 +1,41 @@
+[
+  {
+    "id": 1710000000001,
+    "title": "Inception",
+    "year": 2010,
+    "genre": "Sci-Fi",
+    "rating": 9,
+    "director": "Christopher Nolan",
+    "status": "watched",
+    "isLiked": true,
+    "externalId": "seed-inception",
+    "dateAdded": "2026-05-01T10:00:00.000Z",
+    "updatedAt": "2026-05-01T10:00:00.000Z"
+  },
+  {
+    "id": 1710000000002,
+    "title": "The Matrix",
+    "year": 1999,
+    "genre": "Sci-Fi",
+    "rating": 10,
+    "director": "Lana Wachowski",
+    "status": "watched",
+    "isLiked": true,
+    "externalId": "seed-matrix",
+    "dateAdded": "2026-05-01T10:05:00.000Z",
+    "updatedAt": "2026-05-01T10:05:00.000Z"
+  },
+  {
+    "id": 1710000000003,
+    "title": "Interstellar",
+    "year": 2014,
+    "genre": "Sci-Fi",
+    "rating": 9,
+    "director": "Christopher Nolan",
+    "status": "planned",
+    "isLiked": false,
+    "externalId": "seed-interstellar",
+    "dateAdded": "2026-05-01T10:10:00.000Z",
+    "updatedAt": "2026-05-01T10:10:00.000Z"
+  }
+]

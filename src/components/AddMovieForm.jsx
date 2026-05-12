@@ -3,6 +3,7 @@ import './AddMovieForm.css'
 
 function AddMovieForm({ onAddMovie }) {
   const [showForm, setShowForm] = useState(false)
+  const [error, setError] = useState('')
   const [formData, setFormData] = useState({
     title: '',
     year: new Date().getFullYear(),
@@ -27,18 +28,30 @@ function AddMovieForm({ onAddMovie }) {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (formData.title.trim()) {
-      onAddMovie(formData)
-      setFormData({
-        title: '',
-        year: new Date().getFullYear(),
-        genre: 'Action',
-        rating: 5,
-        director: '',
-        status: 'unwatched'
-      })
-      setShowForm(false)
+    if (!formData.title.trim()) {
+      return
     }
+
+    Promise.resolve(onAddMovie(formData))
+      .then((result) => {
+        if (!result) {
+          return
+        }
+
+        setError('')
+        setFormData({
+          title: '',
+          year: new Date().getFullYear(),
+          genre: 'Action',
+          rating: 5,
+          director: '',
+          status: 'unwatched'
+        })
+        setShowForm(false)
+      })
+      .catch((requestError) => {
+        setError(requestError.message || 'Unable to add movie')
+      })
   }
 
   return (
@@ -148,6 +161,8 @@ function AddMovieForm({ onAddMovie }) {
               Cancel
             </button>
           </div>
+
+          {error && <p className="form-error">{error}</p>}
         </form>
       )}
     </div>

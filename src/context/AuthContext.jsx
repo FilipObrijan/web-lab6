@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect } from 'react'
-import { logout as authLogout, observeAuthState } from '../utils/auth'
+import { clearToken, observeAuthState, saveToken } from '../utils/auth'
 
 export const AuthContext = createContext()
 
@@ -24,12 +24,16 @@ export function AuthProvider({ children }) {
     return () => unsubscribe()
   }, [])
 
-  const login = (user) => {
-    setCurrentUserState(user)
+  const login = (session) => {
+    if (session?.token) {
+      saveToken(session.token)
+    }
+
+    setCurrentUserState(session)
   }
 
   const logout = async () => {
-    await authLogout()
+    clearToken()
     setCurrentUserState(null)
   }
 

@@ -1,16 +1,31 @@
 import { useState } from 'react'
-import { authenticateUser, createUser } from '../utils/auth'
+import { requestAccessToken } from '../utils/auth'
 import { useAuth } from '../context/AuthContext'
 import './AuthPage.css'
 
 function AuthPage() {
   const { login } = useAuth()
-  const [isSignUp, setIsSignUp] = useState(false)
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
+  const [username, setUsername] = useState('demo-user')
+  const [role, setRole] = useState('ADMIN')
+  const [permissions, setPermissions] = useState('READ, CREATE, UPDATE, DELETE')
+  const [requestMode, setRequestMode] = useState('POST')
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+
+  const presetPermissions = {
+    VISITOR: 'READ',
+    WRITER: 'READ, CREATE, UPDATE',
+    ADMIN: 'READ, CREATE, UPDATE, DELETE'
+  }
+
+  const handleRoleChange = (event) => {
+    const nextRole = event.target.value
+    setRole(nextRole)
+
+    if (nextRole in presetPermissions) {
+      setPermissions(presetPermissions[nextRole])
+    }
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -18,33 +33,19 @@ function AuthPage() {
     setIsLoading(true)
 
     try {
-      if (isSignUp) {
-        // Sign up mode
-        if (password !== confirmPassword) {
-          setError('Passwords do not match')
-          setIsLoading(false)
-          return
-        }
-        const user = await createUser(username, password)
-        login(user)
-      } else {
-        // Sign in mode
-        const user = await authenticateUser(username, password)
-        login(user)
-      }
+      const tokenResponse = await requestAccessToken({
+        username,
+        role,
+        permissions,
+        mode: requestMode
+      })
+
+      login(tokenResponse)
     } catch (err) {
       setError(err.message)
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const toggleMode = () => {
-    setIsSignUp(!isSignUp)
-    setError('')
-    setUsername('')
-    setPassword('')
-    setConfirmPassword('')
   }
 
   return (
@@ -56,9 +57,8 @@ function AuthPage() {
             <h1>Movie Watchlist</h1>
           </div>
 
-          <h2 className="auth-title">
-            {isSignUp ? 'Create Account' : 'Sign In'}
-          </h2>
+          <h2 className="auth-title">Generate JWT Access Token</h2>
+          <p className="auth-subtitle">The token expires in 1 minute and unlocks the CRUD API.</p>
 
           {error && <div className="auth-error">{error}</div>}
 
@@ -70,7 +70,7 @@ function AuthPage() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter your username"
+                placeholder="demo-user"
                 required
                 minLength={3}
                 disabled={isLoading}
@@ -78,34 +78,44 @@ function AuthPage() {
             </div>
 
             <div className="form-group">
-              <label htmlFor="password">Password</label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
-                required
-                minLength={6}
+              <label htmlFor="role">Role</label>
+              <select
+                id="role"
+                value={role}
+                onChange={handleRoleChange}
+                disabled={isLoading}
+              >
+                <option value="ADMIN">ADMIN</option>
+                <option value="WRITER">WRITER</option>
+                <option value="VISITOR">VISITOR</option>
+                <option value="CUSTOM">CUSTOM</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="permissions">Permissions</label>
+              <textarea
+                id="permissions"
+                rows="3"
+                value={permissions}
+                onChange={(e) => setPermissions(e.target.value)}
+                placeholder="READ, CREATE, UPDATE, DELETE"
                 disabled={isLoading}
               />
             </div>
 
-            {isSignUp && (
-              <div className="form-group">
-                <label htmlFor="confirmPassword">Confirm Password</label>
-                <input
-                  id="confirmPassword"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Confirm your password"
-                  required
-                  minLength={6}
-                  disabled={isLoading}
-                />
-              </div>
-            )}
+            <div className="form-group">
+              <label htmlFor="requestMode">Request Mode</label>
+              <select
+                id="requestMode"
+                value={requestMode}
+                onChange={(e) => setRequestMode(e.target.value)}
+                disabled={isLoading}
+              >
+                <option value="POST">POST JSON body</option>
+                <option value="GET">GET query params</option>
+              </select>
+            </div>
 
             <button
               type="submit"
@@ -115,40 +125,21 @@ function AuthPage() {
               {isLoading ? (
                 <>
                   <i className="fas fa-spinner fa-spin"></i>
-                  {isSignUp ? 'Creating Account...' : 'Signing In...'}
-                </>
-              ) : isSignUp ? (
-                <>
-                  <i className="fas fa-user-plus"></i>
-                  Create Account
+                  Generating Token...
                 </>
               ) : (
                 <>
-                  <i className="fas fa-sign-in-alt"></i>
-                  Sign In
+                  <i className="fas fa-key"></i>
+                  Generate Token
                 </>
               )}
             </button>
           </form>
 
-          <div className="auth-footer">
-            <p>
-              {isSignUp ? 'Already have an account?' : `Don't have an account?`}
-              <button
-                type="button"
-                onClick={toggleMode}
-                className="toggle-mode-btn"
-                disabled={isLoading}
-              >
-                {isSignUp ? 'Sign In' : 'Create One'}
-              </button>
-            </p>
-          </div>
-
           <div className="demo-info">
             <p>
               <i className="fas fa-info-circle"></i>
-              Your account and movies are synced with Firebase across devices.
+              Use ADMIN to demo every CRUD action. The frontend talks to the backend API through the JWT you generate here.
             </p>
           </div>
         </div>
